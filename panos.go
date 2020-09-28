@@ -62,6 +62,7 @@ type PaloAlto struct {
 type AuthMethod struct {
 	Credentials []string
 	APIKey      string
+	NonAdmin    bool
 }
 
 // Jobs holds information about all jobs on the device.
@@ -631,37 +632,39 @@ func NewSession(host string, authmethod *AuthMethod) (*PaloAlto, error) {
 		key = authmethod.APIKey
 	}
 
-	uri := fmt.Sprintf("https://%s/api/?", host)
-	_, getInfo, errs := r.Get(fmt.Sprintf("%s&key=%s&type=op&cmd=<show><system><info></info></system></show>", uri, key)).End()
-	if errs != nil {
-		return nil, fmt.Errorf("unable to get system info for %s - %s", host, errs[0])
-	}
+	if !authmethod.NonAdmin {
+		uri := fmt.Sprintf("https://%s/api/?", host)
+		_, getInfo, errs := r.Get(fmt.Sprintf("%s&key=%s&type=op&cmd=<show><system><info></info></system></show>", uri, key)).End()
+		if errs != nil {
+			return nil, fmt.Errorf("unable to get system info for %s - %s", host, errs[0])
+		}
 
-	err := xml.Unmarshal([]byte(getInfo), &info)
-	if err != nil {
-		return nil, err
-	}
+		err := xml.Unmarshal([]byte(getInfo), &info)
+		if err != nil {
+			return nil, err
+		}
 
-	if info.Status != "success" {
-		return nil, fmt.Errorf("error code %s: %s (show system info)", info.Code, errorCodes[info.Code])
-	}
+		if info.Status != "success" {
+			return nil, fmt.Errorf("error code %s: %s (show system info)", info.Code, errorCodes[info.Code])
+		}
 
-	_, panStatus, errs := r.Get(fmt.Sprintf("%s&key=%s&type=op&cmd=<show><panorama-status></panorama-status></show>", uri, key)).End()
-	if errs != nil {
-		return nil, fmt.Errorf("unable to get Panorama status for %s - %s", host, errs[0])
-	}
+		_, panStatus, errs := r.Get(fmt.Sprintf("%s&key=%s&type=op&cmd=<show><panorama-status></panorama-status></show>", uri, key)).End()
+		if errs != nil {
+			return nil, fmt.Errorf("unable to get Panorama status for %s - %s", host, errs[0])
+		}
 
-	err = xml.Unmarshal([]byte(panStatus), &pan)
-	if err != nil {
-		return nil, err
-	}
+		err = xml.Unmarshal([]byte(panStatus), &pan)
+		if err != nil {
+			return nil, err
+		}
 
-	if info.Platform == "m" || info.Model == "Panorama" {
-		deviceType = "panorama"
-	}
+		if info.Platform == "m" || info.Model == "Panorama" {
+			deviceType = "panorama"
+		}
 
-	if strings.Contains(pan.Data, ": yes") {
-		status = true
+		if strings.Contains(pan.Data, ": yes") {
+			status = true
+		}
 	}
 
 	return &PaloAlto{
