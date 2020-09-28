@@ -1,4 +1,4 @@
-module github.com/scottdware/go-panos
+module github.com/amitsaini-au/go-panos
 
 go 1.13
 
